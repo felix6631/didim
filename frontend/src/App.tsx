@@ -5,6 +5,18 @@ import type { Assessment, Attachment, CaseItem, Message, RiskLevel } from "./typ
 const riskLabel:Record<RiskLevel,string>={low:"낮음",caution:"주의",danger:"위험",emergency:"긴급"};
 const initialAssessment:Assessment={level:"low",score:0,category:"분석 전",rationale:"상황을 입력하면 위험도와 대응 절차를 정리합니다.",actions:[],based_law:[]};
 
+const emptyTitles = [
+  "혼자 감당하지 않아도 됩니다",
+  "무슨 생각을 하시나요?",
+  "지금 겪고 있는 일을 들려주세요",
+  "편하게 말씀해 주세요",
+  "필요한 도움을 함께 찾아볼게요"
+];
+
+function getRandomEmptyTitle() {
+  return emptyTitles[Math.floor(Math.random() * emptyTitles.length)];
+}
+
 function renderText(text:string){ return text.split("\n").map((line,i)=><span key={i}>{line.replaceAll("**","")}<br/></span>); }
 function formatBytes(size:number){ return size<1024?`${size}B`:size<1024*1024?`${(size/1024).toFixed(1)}KB`:`${(size/1024/1024).toFixed(1)}MB`; }
 function formatDate(iso:string){ try{ return new Date(iso).toLocaleString("ko-KR"); }catch{ return iso; } }
@@ -14,6 +26,7 @@ export default function App(){
   const [input,setInput]=useState(""),[assessment,setAssessment]=useState<Assessment>(initialAssessment),[loading,setLoading]=useState(false),[aside,setAside]=useState(true),[error,setError]=useState("");
   const [attachments,setAttachments]=useState<Attachment[]>([]),[uploading,setUploading]=useState(false);
   const [railOpen,setRailOpen]=useState(false);
+  const [emptyTitle,setEmptyTitle]=useState(getRandomEmptyTitle);
   const thread=useRef<HTMLDivElement>(null);
   const fileInput=useRef<HTMLInputElement>(null);
   const active=cases.find(c=>c.id===selected);
@@ -30,7 +43,10 @@ export default function App(){
   useEffect(()=>{refresh().catch(()=>setError("백엔드에 연결할 수 없습니다. start.bat을 실행했는지 확인하세요."));},[]);
   useEffect(()=>{thread.current?.scrollTo({top:thread.current.scrollHeight,behavior:"smooth"});},[messages]);
 
-  async function addCase(){const c=await createCase();setAssessment(initialAssessment);setAttachments([]);await refresh(c.id);setRailOpen(false);}
+  async function addCase() {
+  const c = await createCase();
+
+  setEmptyTitle(current => {const candidates = emptyTitles.filter(title => title !== current);return candidates[Math.floor(Math.random() * candidates.length)];});setAssessment(initialAssessment);setAttachments([]);await refresh(c.id);setRailOpen(false);}
   async function choose(id:number){setSelected(id);setMessages(await getMessages(id));await loadAssessment(id,cases.find(x=>x.id===id));await loadAttachments(id);setRailOpen(false);}
   async function del(){if(!selected||!confirm("이 상담 기록을 삭제할까요?"))return;await removeCase(selected);setSelected(null);setMessages([]);setAttachments([]);await refresh();}
   async function send(e?:FormEvent){e?.preventDefault();if(!input.trim()||loading)return;let id=selected;if(!id){const c=await createCase();id=c.id;setSelected(id);}const content=input.trim();setInput("");setError("");setLoading(true);setMessages(m=>[...m,{case_id:id!,role:"user",content},{case_id:id!,role:"assistant",content:""}]);try{const result=await streamChat(id,content,t=>setMessages(m=>m.map((x,i)=>i===m.length-1?{...x,content:x.content+t}:x)));setAssessment(result);await refresh(id);}catch(err){setError(err instanceof Error?err.message:"오류가 발생했습니다.");setMessages(m=>m.slice(0,-1));}finally{setLoading(false);}}
@@ -50,6 +66,8 @@ export default function App(){
     await removeAttachment(selected,attachmentId);
     await loadAttachments(selected);
   }
+  
+  const isGreetingOnly =messages.length === 1 &&messages[0].role === "assistant";const visibleMessages = isGreetingOnly ? [] : messages;
 
   return <main className="app-shell">
     <header className="titlebar">
@@ -88,15 +106,7 @@ export default function App(){
           <button onClick={del} disabled={!selected}>삭제</button>
           <button onClick={exportPrint}>내보내기</button>
         </div>
-        <div className="thread" ref={thread}>{messages.length===0&&
-          <div className="empty">
-            <div className="empty-logo">
-              <img src="/icons/icon.svg" alt="디딤" />
-            
-          </div>
-            <h2>혼자 감당하지 않아도 됩니다</h2>
-            <p>새 상담을 시작하고 상황을 시간 순서대로 적어 주세요.<br/>학생·학부모의 실명과 연락처는 입력하지 마세요.</p>
-          </div>}{messages.map((m,i)=><article className={`message ${m.role}`} key={m.id??i}><div className="avatar">
+        <div className="thread" ref={thread}>{visibleMessages.length===0&&<div className="empty"><div className="empty-logo"><img src="/icons/icon.svg" alt="디딤" /></div><h2>{emptyTitle}</h2><p>새 상담을 시작하고 상황을 편하게 적어 주세요.<br/>학생·학부모의 실명과 연락처는 입력하지 마세요.</p></div>}{visibleMessages.map((m,i)=><article className={`message ${m.role}`} key={m.id??i}><div className="avatar">
           {m.role === "assistant" ? (
             <img src="/icons/icon.svg" alt="디딤" />
           ) : ("나")}</div><div className="bubble">{renderText(m.content||"답변을 정리하고 있습니다…")}</div></article>)}</div>
