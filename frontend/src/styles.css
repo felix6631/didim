@@ -276,6 +276,9 @@
 .layout.dark-mode .report-print td {
   border-color: #3a3a3a;
 }
+.layout.dark-mode .response-time {
+  color: #888;
+}
 .layout.dark-mode .new-answer-btn {
   background: #242424;
   color: #eeeeee;
@@ -357,4 +360,9 @@
     opacity: 1;
     transform: translateX(-50%) translateY(0);
   }
+}
+.response-time {
+  font-size: 11px;
+  color: #999;
+  margin-right: 6px;
 }

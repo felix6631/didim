@@ -24,6 +24,7 @@ export default function App() {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const [darkMode, setDarkMode] = useState(false);
   const [showNewAnswer, setShowNewAnswer] = useState(false);
+  const [responseTime, setResponseTime] = useState<number | null>(null);
 const [bookmarks, setBookmarks] = useState<number[]>(() => {
   try {
     return JSON.parse(localStorage.getItem("didim-bookmarks") || "[]");
@@ -173,6 +174,7 @@ function toggleBookmark(messageId: number) {
 
     setInput("");
     setError("");
+    const startTime = performance.now();
     setLoading(true);
 
     setMessages(m => [
@@ -204,7 +206,11 @@ function toggleBookmark(messageId: number) {
       );
 
       setAssessment(result);
-      await refresh(id);
+
+const elapsed = (performance.now() - startTime) / 1000;
+setResponseTime(Number(elapsed.toFixed(1)));
+
+await refresh(id);
     } catch (err) {
       setError(
         err instanceof Error
@@ -265,6 +271,11 @@ function toggleBookmark(messageId: number) {
 
   {m.role === "assistant" && m.content && !loading && (
     <div className="message-actions">
+      {responseTime !== null && i === messages.length - 1 && (
+  <span className="response-time">
+    답변 완료 · {responseTime.toFixed(1)}초
+  </span>
+)}
       <button
         type="button"
         onClick={() => copyAnswer(m.content)}
