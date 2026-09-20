@@ -23,6 +23,7 @@ export default function App() {
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const [darkMode, setDarkMode] = useState(false);
+  const [showNewAnswer, setShowNewAnswer] = useState(false);
 const [bookmarks, setBookmarks] = useState<number[]>(() => {
   try {
     return JSON.parse(localStorage.getItem("didim-bookmarks") || "[]");
@@ -133,7 +134,24 @@ function toggleBookmark(messageId: number) {
 
   async function refresh(prefer?: number) { const all = await listCases(); setCases(all); const id = prefer ?? selected ?? all[0]?.id; if (id) { setSelected(id); setMessages(await getMessages(id)); await loadAssessment(id, all.find(x => x.id === id)); await loadAttachments(id); } }
   useEffect(() => { refresh().catch(() => setError("백엔드에 연결할 수 없습니다. start.bat을 실행했는지 확인하세요.")); }, []);
-  useEffect(() => { thread.current?.scrollTo({ top: thread.current.scrollHeight, behavior: "smooth" }); }, [messages]);
+  useEffect(() => {
+  const el = thread.current;
+  if (!el) return;
+
+  const isNearBottom =
+    el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+
+  if (isNearBottom) {
+    el.scrollTo({
+      top: el.scrollHeight,
+      behavior: "smooth"
+    });
+
+    setShowNewAnswer(false);
+  } else {
+    setShowNewAnswer(true);
+  }
+}, [messages]);
 
   async function addCase() { const c = await createCase(); setAssessment(initialAssessment); setAttachments([]); await refresh(c.id); setRailOpen(false); }
   async function choose(id: number) { setSelected(id); setMessages(await getMessages(id)); await loadAssessment(id, cases.find(x => x.id === id)); await loadAttachments(id); setRailOpen(false); }
@@ -228,34 +246,33 @@ function toggleBookmark(messageId: number) {
 
 <button onClick={del} disabled={!selected}>삭제</button>
 <button onClick={exportPrint}>내보내기</button></div>
-        <div className="thread" ref={thread}>{messages.length === 0 && <div className="empty"><div className="empty-logo">디</div><h2>혼자 감당하지 않아도 됩니다</h2><p>새 상담을 시작하고 상황을 시간 순서대로 적어 주세요.<br />학생·학부모의 실명과 연락처는 입력하지 마세요.</p></div>}{messages.map((m, i) => <article className={`message ${m.role}`} key={m.id ?? i}><div className="avatar">{m.role === "assistant" ? "디" : "나"}</div><div className="bubble">
+        <div className="thread" ref={thread}>{showNewAnswer && (
+  <button
+    type="button"
+    className="new-answer-btn"
+    onClick={() => {
+      thread.current?.scrollTo({
+        top: thread.current.scrollHeight,
+        behavior: "smooth"
+      });
+      setShowNewAnswer(false);
+    }}
+  >
+    ↓ 새 답변
+  </button>
+)}{messages.length === 0 && <div className="empty"><div className="empty-logo">디</div><h2>혼자 감당하지 않아도 됩니다</h2><p>새 상담을 시작하고 상황을 시간 순서대로 적어 주세요.<br />학생·학부모의 실명과 연락처는 입력하지 마세요.</p></div>}{messages.map((m, i) => <article className={`message ${m.role}`} key={m.id ?? i}><div className="avatar">{m.role === "assistant" ? "디" : "나"}</div><div className="bubble">
   {renderText(m.content || "답변을 정리하고 있습니다…")}
 
   {m.role === "assistant" && m.content && !loading && (
     <div className="message-actions">
-  <button
-    type="button"
-    onClick={() => copyAnswer(m.content)}
-    className="copy-btn"
-  >
-    📋 복사
-  </button>
-
-  <button
-    type="button"
-    onClick={() => toggleBookmark(m.id)}
-    className={`bookmark-btn ${
-      bookmarks.includes(m.id) ? "active" : ""
-    }`}
-    title={
-      bookmarks.includes(m.id)
-        ? "북마크 해제"
-        : "북마크"
-    }
-  >
-    {bookmarks.includes(m.id) ? "★" : "☆"}
-  </button>
-</div>
+      <button
+        type="button"
+        onClick={() => copyAnswer(m.content)}
+        className="copy-btn"
+      >
+        📋 복사
+      </button>
+    </div>
   )}
 </div></article>)}</div>
         {error && <div className="error">{error}</div>}<form className="composer" onSubmit={send}>
