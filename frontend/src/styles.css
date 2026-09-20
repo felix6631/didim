@@ -350,7 +350,7 @@ body {
     border-top-left-radius: 4px;
     background: #fff;
     padding: 13px 15px;
-    font-size: 14px;
+    font-size: 16px;
     line-height: 1.66
 }
 
@@ -380,7 +380,7 @@ body {
     align-items: flex-end;
     gap: 8px;
     border: 1px solid #cdd6de;
-    border-radius: 13px;
+    border-radius: 999px;
     padding: 8px
 }
 
@@ -971,4 +971,166 @@ section label {
     font-size: 15px;
     line-height: 1.8;
     margin: 0;
+}
+
+/* =========================
+   채팅 입력창
+   ========================= */
+
+.input {
+    min-height: 48px;
+    height: auto;
+
+    display: flex;
+    align-items: center;
+    gap: 4px;
+
+    padding: 0 6px;
+
+    border: 1px solid #cdd6de;
+    border-radius: 999px;
+
+    position: relative;
+    overflow: hidden;
+
+    transition: border-radius 0.15s ease;
+}
+
+.input.expanded {
+    border-radius: 18px;
+}
+
+.input:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px #2e7d741f;
+}
+
+/* 파일 선택창 */
+.input .file-hidden {
+    display: none;
+}
+
+/* + 첨부 버튼 */
+.input .attach-btn {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+
+    padding: 0;
+    margin: 0 2px 0 0;
+
+    border: 0;
+    border-radius: 50%;
+
+    background: transparent;
+    color: #333;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    font-family: Arial, sans-serif;
+    font-size: 26px;
+    font-weight: 400;
+    line-height: 1;
+
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.input .attach-btn:hover {
+    background: #f0f0f0;
+}
+
+/* 첨부자료 추가 툴팁 */
+.input .attach-btn:hover::after {
+    content: "첨부자료 추가";
+
+    position: absolute;
+    bottom: calc(100% + 9px);
+    left: 22px;
+    
+    padding: 7px 11px;
+
+    border-radius: 8px;
+
+    background: #111;
+    color: #fff;
+
+    font-family: "Pretendard Variable", Pretendard, "Malgun Gothic", sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.2;
+
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 100;
+}
+
+/* 텍스트 입력 */
+.input textarea {
+    flex: 1;
+    min-width: 0;
+
+    height: 46px;
+    min-height: 46px;
+    max-height: 92px;
+
+    padding: 11px 6px;
+
+    margin: 0;
+
+    border: 0;
+    outline: 0;
+    resize: none;
+
+    background: transparent;
+
+    font-family: "Pretendard Variable", Pretendard, "Malgun Gothic", sans-serif;
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 23px;
+
+    overflow-y: hidden;
+
+    box-sizing: border-box;
+}
+
+/* 전송 버튼 */
+.input .send-btn {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+
+    padding: 0;
+    margin: 0;
+
+    border: 0;
+    border-radius: 50%;
+
+    display: grid;
+    place-items: center;
+
+    cursor: pointer;
+}
+/* 2~3줄 입력 시 사각형에 가까운 모양 */
+.input {
+    min-height: 48px;
+    height: auto;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+
+    padding: 0 6px;
+    border: 1px solid #cdd6de;
+    border-radius: 999px;
+
+    position: relative;
+    overflow: hidden;
+
+    transition: border-radius 0.15s ease;
+}
+
+.input.expanded {
+    border-radius: 18px;
 }
