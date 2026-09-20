@@ -8,7 +8,7 @@ const initialAssessment: Assessment = { level: "low", score: 0, category: "ë¶„ì„
 function renderText(text: string) { return text.split("\n").map((line, i) => <span key={i}>{line.replaceAll("**", "")}<br /></span>); }
 function formatBytes(size: number) { return size < 1024 ? `${size}B` : size < 1024 * 1024 ? `${(size / 1024).toFixed(1)}KB` : `${(size / 1024 / 1024).toFixed(1)}MB`; }
 function formatDate(iso: string) { try { return new Date(iso).toLocaleString("ko-KR"); } catch { return iso; } }
-
+function exportPrint(){window.print();}
 export default function App() {
   const [cases, setCases] = useState<CaseItem[]>([]), [selected, setSelected] = useState<number | null>(null), [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState(""), [assessment, setAssessment] = useState<Assessment>(initialAssessment), [loading, setLoading] = useState(false), [aside, setAside] = useState(true), [error, setError] = useState("");
@@ -90,7 +90,7 @@ export default function App() {
     recognitionRef.current = recognition;
     recognition.start();
   }
-
+  
   async function loadAttachments(id: number) { try { setAttachments(await listAttachments(id)); } catch { setAttachments([]); } }
   async function loadAssessment(id: number, fallback?: CaseItem) {
     const latest = await getLatestAssessment(id);
