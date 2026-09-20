@@ -23,7 +23,12 @@ function formatDate(iso:string){ try{ return new Date(iso).toLocaleString("ko-KR
 
 export default function App(){
   const [cases,setCases]=useState<CaseItem[]>([]),[selected,setSelected]=useState<number|null>(null),[messages,setMessages]=useState<Message[]>([]);
-  const [input,setInput]=useState(""),[assessment,setAssessment]=useState<Assessment>(initialAssessment),[loading,setLoading]=useState(false),[aside,setAside]=useState(true),[error,setError]=useState("");
+  const [input, setInput] = useState("");
+  const [assessment, setAssessment] = useState<Assessment>(initialAssessment);
+  const [loading, setLoading] = useState(false);
+  const [aside, setAside] = useState(true);
+  const [error, setError] = useState("");
+  const [inputExpanded, setInputExpanded] = useState(false);
   const [attachments,setAttachments]=useState<Attachment[]>([]),[uploading,setUploading]=useState(false);
   const [railOpen,setRailOpen]=useState(false);
   const [emptyTitle,setEmptyTitle]=useState(getRandomEmptyTitle);
@@ -112,10 +117,53 @@ export default function App(){
           ) : ("나")}</div><div className="bubble">{renderText(m.content||"답변을 정리하고 있습니다…")}</div></article>)}</div>
         {error&&<div className="error">{error}</div>} 
         <form className="composer" onSubmit={send}>
-          <div className="input">
-            <textarea value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}} placeholder="상황을 자세히 적어 주세요…" maxLength={8000}/>
-              <button disabled={loading||input.trim().length<2}>{loading?"…":"➜"}</button>
-          </div>
+          <div className={`input ${inputExpanded ? "expanded" : ""}`}><input
+            ref={fileInput}
+            type="file"
+            className="file-hidden"
+            onChange={onUpload}
+          />
+
+          <button
+            type="button"
+            className="attach-btn"
+            aria-label="첨부자료 추가"
+            title="첨부자료 추가"
+            disabled={uploading}
+            onClick={() => fileInput.current?.click()}
+          >
+            +
+          </button>
+          
+          <textarea
+            value={input}
+            onChange={e => {
+              const el = e.target;
+              el.style.height = "46px";
+              const nextHeight = Math.min(el.scrollHeight, 92);
+              el.style.height = `${nextHeight}px`;
+              el.style.overflowY = el.scrollHeight > 92 ? "auto" : "hidden";
+              setInputExpanded(nextHeight > 46);
+              setInput(el.value);
+            }}
+            onKeyDown={e => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                send();
+              }
+            }}
+            placeholder="상황을 자세히 적어 주세요…"
+            maxLength={8000}
+          />
+
+          <button
+            type="submit"
+            className="send-btn"
+            disabled={loading || input.trim().length < 2}
+          >
+            {loading ? "…" : "➜"}
+          </button>
+        </div>
           <small>일반적인 안내 도구이며 구체적인 판단은 교원단체·법률 전문가의 검토가 필요합니다.</small>
         </form>
       </section>
