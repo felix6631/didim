@@ -354,6 +354,27 @@ body {
     line-height: 1.66
 }
 
+.bubble strong {
+    font-weight: 700;
+    color: var(--ink);
+}
+
+.bubble em {
+    font-style: italic;
+}
+
+.bubble del {
+    text-decoration: line-through;
+}
+
+.bubble code {
+    padding: 2px 6px;
+    border-radius: 6px;
+    background: #eef2f5;
+    font-family: monospace;
+    font-size: 0.92em;
+}
+
 .user .bubble {
     background: #eef2f6;
     border-top-left-radius: 13px;
@@ -976,29 +997,6 @@ section label {
 /* =========================
    채팅 입력창
    ========================= */
-
-.input {
-    min-height: 48px;
-    height: auto;
-
-    display: flex;
-    align-items: center;
-    gap: 4px;
-
-    padding: 0 6px;
-
-    border: 1px solid #cdd6de;
-    border-radius: 999px;
-
-    position: relative;
-    overflow: hidden;
-
-    transition: border-radius 0.15s ease;
-}
-
-.input.expanded {
-    border-radius: 18px;
-}
 
 .input:focus-within {
     border-color: var(--accent);
