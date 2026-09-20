@@ -5,6 +5,18 @@ import type { Assessment, Attachment, CaseItem, Message, RiskLevel } from "./typ
 const riskLabel:Record<RiskLevel,string>={low:"낮음",caution:"주의",danger:"위험",emergency:"긴급"};
 const initialAssessment:Assessment={level:"low",score:0,category:"분석 전",rationale:"상황을 입력하면 위험도와 대응 절차를 정리합니다.",actions:[],based_law:[]};
 
+const emptyTitles = [
+  "혼자 감당하지 않아도 됩니다",
+  "무슨 생각을 하시나요?",
+  "지금 겪고 있는 일을 들려주세요",
+  "편하게 말씀해 주세요",
+  "필요한 도움을 함께 찾아볼게요"
+];
+
+function getRandomEmptyTitle() {
+  return emptyTitles[Math.floor(Math.random() * emptyTitles.length)];
+}
+
 function renderText(text:string){ return text.split("\n").map((line,i)=><span key={i}>{line.replaceAll("**","")}<br/></span>); }
 function formatBytes(size:number){ return size<1024?`${size}B`:size<1024*1024?`${(size/1024).toFixed(1)}KB`:`${(size/1024/1024).toFixed(1)}MB`; }
 function formatDate(iso:string){ try{ return new Date(iso).toLocaleString("ko-KR"); }catch{ return iso; } }
@@ -14,6 +26,7 @@ export default function App(){
   const [input,setInput]=useState(""),[assessment,setAssessment]=useState<Assessment>(initialAssessment),[loading,setLoading]=useState(false),[aside,setAside]=useState(true),[error,setError]=useState("");
   const [attachments,setAttachments]=useState<Attachment[]>([]),[uploading,setUploading]=useState(false);
   const [railOpen,setRailOpen]=useState(false);
+  const [emptyTitle,setEmptyTitle]=useState(getRandomEmptyTitle);
   const thread=useRef<HTMLDivElement>(null);
   const fileInput=useRef<HTMLInputElement>(null);
   const active=cases.find(c=>c.id===selected);
@@ -30,7 +43,10 @@ export default function App(){
   useEffect(()=>{refresh().catch(()=>setError("백엔드에 연결할 수 없습니다. start.bat을 실행했는지 확인하세요."));},[]);
   useEffect(()=>{thread.current?.scrollTo({top:thread.current.scrollHeight,behavior:"smooth"});},[messages]);
 
-  async function addCase(){const c=await createCase();setAssessment(initialAssessment);setAttachments([]);await refresh(c.id);setRailOpen(false);}
+  async function addCase() {
+  const c = await createCase();
+
+  setEmptyTitle(current => {const candidates = emptyTitles.filter(title => title !== current);return candidates[Math.floor(Math.random() * candidates.length)];});setAssessment(initialAssessment);setAttachments([]);await refresh(c.id);setRailOpen(false);}
   async function choose(id:number){setSelected(id);setMessages(await getMessages(id));await loadAssessment(id,cases.find(x=>x.id===id));await loadAttachments(id);setRailOpen(false);}
   async function del(){if(!selected||!confirm("이 상담 기록을 삭제할까요?"))return;await removeCase(selected);setSelected(null);setMessages([]);setAttachments([]);await refresh();}
   async function send(e?:FormEvent){e?.preventDefault();if(!input.trim()||loading)return;let id=selected;if(!id){const c=await createCase();id=c.id;setSelected(id);}const content=input.trim();setInput("");setError("");setLoading(true);setMessages(m=>[...m,{case_id:id!,role:"user",content},{case_id:id!,role:"assistant",content:""}]);try{const result=await streamChat(id,content,t=>setMessages(m=>m.map((x,i)=>i===m.length-1?{...x,content:x.content+t}:x)));setAssessment(result);await refresh(id);}catch(err){setError(err instanceof Error?err.message:"오류가 발생했습니다.");setMessages(m=>m.slice(0,-1));}finally{setLoading(false);}}
@@ -50,15 +66,58 @@ export default function App(){
     await removeAttachment(selected,attachmentId);
     await loadAttachments(selected);
   }
+  
+  const isGreetingOnly =messages.length === 1 &&messages[0].role === "assistant";const visibleMessages = isGreetingOnly ? [] : messages;
 
   return <main className="app-shell">
-    <header className="titlebar"><span className="logo-sm"/>디딤 — 교권 침해 상담 도우미<span className="title-space"/><span className="status">LOCAL</span></header>
+    <header className="titlebar">
+      <img className="logo-sm" src="/icons/icon.svg" alt="디딤" />디딤 — 교권 침해 상담 도우미
+      <span className="title-space"/>
+      <span className="status">LOCAL</span>
+    </header>
     <div className={`layout ${aside?"":"aside-closed"}`}>
       {railOpen&&<div className="rail-backdrop show" onClick={()=>setRailOpen(false)}/>}
-      <nav className={`rail ${railOpen?"open":""}`}><div className="brand"><div className="logo">디</div><div><b>디딤</b><small>교권 침해 상담</small></div></div><button className="new" onClick={addCase}>＋ 새 상담 시작</button><div className="rail-label">최근 상담</div><div className="case-list">{cases.map(c=><button className={`case ${selected===c.id?"active":""}`} onClick={()=>choose(c.id)} key={c.id}><i className={c.risk_level}/><span><b>{c.title}</b><small>{c.category} · {c.risk_score}점</small></span></button>)}</div><div className="privacy">🔒 상담 내용은 이 컴퓨터에 저장됩니다.</div></nav>
-      <section className="chat"><div className="chat-head"><button className="menu-btn" aria-label="상담 목록" onClick={()=>setRailOpen(x=>!x)}>☰</button><div><h1>{active?.title??"새 상담"}</h1><small>{active?`사건 #${String(active.id).padStart(4,"0")}`:"상담을 시작하세요"}</small></div><span/><button onClick={()=>setAside(x=>!x)}>{aside?"결과 접기":"결과 보기"}</button><button onClick={del} disabled={!selected}>삭제</button><button onClick={exportPrint}>내보내기</button></div>
-        <div className="thread" ref={thread}>{messages.length===0&&<div className="empty"><div className="empty-logo">디</div><h2>혼자 감당하지 않아도 됩니다</h2><p>새 상담을 시작하고 상황을 시간 순서대로 적어 주세요.<br/>학생·학부모의 실명과 연락처는 입력하지 마세요.</p></div>}{messages.map((m,i)=><article className={`message ${m.role}`} key={m.id??i}><div className="avatar">{m.role==="assistant"?"디":"나"}</div><div className="bubble">{renderText(m.content||"답변을 정리하고 있습니다…")}</div></article>)}</div>
-        {error&&<div className="error">{error}</div>}<form className="composer" onSubmit={send}><div className="input"><textarea value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}} placeholder="상황을 자세히 적어 주세요…" maxLength={8000}/><button disabled={loading||input.trim().length<2}>{loading?"…":"➜"}</button></div><small>일반적인 안내 도구이며 구체적인 판단은 교원단체·법률 전문가의 검토가 필요합니다.</small></form>
+      <nav className={`rail ${railOpen?"open":""}`}>
+        <div className="brand">
+          <div className="logo">
+            <img src="/icons/icon.svg" alt="디딤" />
+            </div><div><b>디딤</b>
+            <small>교권 침해 상담</small>
+          </div>
+        </div>
+        <button className="new" onClick={addCase}>＋ 새 상담 시작</button>
+        <div className="rail-label">최근 상담</div>
+        <div className="case-list">{
+          cases.map(c=><button className={`case ${selected===c.id?"active":""}`} 
+          onClick={()=>choose(c.id)} key={c.id}><i className={c.risk_level}/>
+          <span>
+            <b>{c.title}</b>
+            <small>{c.category} · {c.risk_score}점</small>
+          </span>
+          </button>)
+          }
+        </div>
+        <div className="privacy">🔒 상담 내용은 이 컴퓨터에 저장됩니다.</div></nav>
+      <section className="chat">
+        <div className="chat-head"><button className="menu-btn" aria-label="상담 목록" onClick={()=>setRailOpen(x=>!x)}>☰</button>
+        <div><h1>{active?.title??"새 상담"}</h1><small>{active?`사건 #${String(active.id).padStart(4,"0")}`:"상담을 시작하세요"}</small></div>
+          <span/>
+          <button onClick={()=>setAside(x=>!x)}>{aside?"결과 접기":"결과 보기"}</button>
+          <button onClick={del} disabled={!selected}>삭제</button>
+          <button onClick={exportPrint}>내보내기</button>
+        </div>
+        <div className="thread" ref={thread}>{visibleMessages.length===0&&<div className="empty"><div className="empty-logo"><img src="/icons/icon.svg" alt="디딤" /></div><h2>{emptyTitle}</h2><p>새 상담을 시작하고 상황을 편하게 적어 주세요.<br/>학생·학부모의 실명과 연락처는 입력하지 마세요.</p></div>}{visibleMessages.map((m,i)=><article className={`message ${m.role}`} key={m.id??i}><div className="avatar">
+          {m.role === "assistant" ? (
+            <img src="/icons/icon.svg" alt="디딤" />
+          ) : ("나")}</div><div className="bubble">{renderText(m.content||"답변을 정리하고 있습니다…")}</div></article>)}</div>
+        {error&&<div className="error">{error}</div>} 
+        <form className="composer" onSubmit={send}>
+          <div className="input">
+            <textarea value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}} placeholder="상황을 자세히 적어 주세요…" maxLength={8000}/>
+              <button disabled={loading||input.trim().length<2}>{loading?"…":"➜"}</button>
+          </div>
+          <small>일반적인 안내 도구이며 구체적인 판단은 교원단체·법률 전문가의 검토가 필요합니다.</small>
+        </form>
       </section>
       {aside&&<aside className="aside"><div className="aside-head"><div><h2>상담 결과</h2><small>입력 내용 기반 임시 분석</small></div><button onClick={()=>setAside(false)}>›</button></div><div className="aside-scroll"><div className="meta"><span>분류</span><b>{assessment.category}</b></div><section className={`risk ${assessment.level}`}><label>위험도</label><div className="risk-card"><div><strong>{riskLabel[assessment.level]}</strong><b>{assessment.score} / 100</b></div><div className="gauge"><i style={{width:`${assessment.score}%`}}/></div><p>{assessment.rationale}</p></div></section><section className="result"><label>대응 권고</label><div>{assessment.actions.length?<ol>{assessment.actions.map(x=><li key={x}>{x}</li>)}</ol>:<p>상담을 진행하면 단계별 조치가 표시됩니다.</p>}</div></section>{assessment.based_law.length>0&&<section className="result"><label>근거 법령</label><div><ul className="law-list">{assessment.based_law.map(x=><li key={x}>{x}</li>)}</ul></div></section>}<section className="attachments"><label>증거 자료</label><div><input ref={fileInput} type="file" className="file-hidden" onChange={onUpload}/><button type="button" className="upload-btn" disabled={uploading} onClick={()=>fileInput.current?.click()}>{uploading?"업로드 중…":"📎 파일 첨부"}</button>{attachments.length>0&&<ul className="file-list">{attachments.map(a=><li key={a.id}><a href={attachmentDownloadUrl(a.case_id,a.id)} target="_blank" rel="noreferrer">{a.filename}</a><small>{formatBytes(a.size)}</small><button type="button" onClick={()=>onDeleteAttachment(a.id)}>✕</button></li>)}</ul>}</div></section><section className="notice"><b>꼭 확인하세요</b><p>법령과 절차는 개정될 수 있습니다. 이 앱의 결과만으로 신고·징계·법적 조치를 결정하지 마세요.</p></section></div><div className="aside-actions"><button onClick={exportPrint}>PDF로 인쇄</button></div></aside>}
     </div>
