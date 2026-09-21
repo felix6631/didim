@@ -17,13 +17,50 @@ function getRandomEmptyTitle() {
   return emptyTitles[Math.floor(Math.random() * emptyTitles.length)];
 }
 
-function renderText(text:string){ return text.split("\n").map((line,i)=><span key={i}>{line.replaceAll("**","")}<br/></span>); }
+function renderInlineText(text:string) {
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|~~[^~]+~~|`[^`]+`)/g);
+
+  return parts.map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={index}>{part.slice(2, -2)}</strong>;
+    }
+
+    if (part.startsWith("*") && part.endsWith("*")) {
+      return <em key={index}>{part.slice(1, -1)}</em>;
+    }
+
+    if (part.startsWith("~~") && part.endsWith("~~")) {
+      return <del key={index}>{part.slice(2, -2)}</del>;
+    }
+
+    if (part.startsWith("`") && part.endsWith("`")) {
+      return <code key={index}>{part.slice(1, -1)}</code>;
+    }
+
+    return <span key={index}>{part}</span>;
+  });
+}
+
+function renderText(text: string) {
+  return text.split("\n").map((line, i) => (
+    <span key={i}>
+      {renderInlineText(line)}
+      <br />
+    </span>
+  ));
+}
+
 function formatBytes(size:number){ return size<1024?`${size}B`:size<1024*1024?`${(size/1024).toFixed(1)}KB`:`${(size/1024/1024).toFixed(1)}MB`; }
 function formatDate(iso:string){ try{ return new Date(iso).toLocaleString("ko-KR"); }catch{ return iso; } }
 
 export default function App(){
   const [cases,setCases]=useState<CaseItem[]>([]),[selected,setSelected]=useState<number|null>(null),[messages,setMessages]=useState<Message[]>([]);
-  const [input,setInput]=useState(""),[assessment,setAssessment]=useState<Assessment>(initialAssessment),[loading,setLoading]=useState(false),[aside,setAside]=useState(true),[error,setError]=useState("");
+  const [input, setInput] = useState("");
+  const [assessment, setAssessment] = useState<Assessment>(initialAssessment);
+  const [loading, setLoading] = useState(false);
+  const [aside, setAside] = useState(true);
+  const [error, setError] = useState("");
+  const [inputExpanded, setInputExpanded] = useState(false);
   const [attachments,setAttachments]=useState<Attachment[]>([]),[uploading,setUploading]=useState(false);
   const [railOpen,setRailOpen]=useState(false);
   const [emptyTitle,setEmptyTitle]=useState(getRandomEmptyTitle);
@@ -49,7 +86,7 @@ export default function App(){
   setEmptyTitle(current => {const candidates = emptyTitles.filter(title => title !== current);return candidates[Math.floor(Math.random() * candidates.length)];});setAssessment(initialAssessment);setAttachments([]);await refresh(c.id);setRailOpen(false);}
   async function choose(id:number){setSelected(id);setMessages(await getMessages(id));await loadAssessment(id,cases.find(x=>x.id===id));await loadAttachments(id);setRailOpen(false);}
   async function del(){if(!selected||!confirm("이 상담 기록을 삭제할까요?"))return;await removeCase(selected);setSelected(null);setMessages([]);setAttachments([]);await refresh();}
-  async function send(e?:FormEvent){e?.preventDefault();if(!input.trim()||loading)return;let id=selected;if(!id){const c=await createCase();id=c.id;setSelected(id);}const content=input.trim();setInput("");setError("");setLoading(true);setMessages(m=>[...m,{case_id:id!,role:"user",content},{case_id:id!,role:"assistant",content:""}]);try{const result=await streamChat(id,content,t=>setMessages(m=>m.map((x,i)=>i===m.length-1?{...x,content:x.content+t}:x)));setAssessment(result);await refresh(id);}catch(err){setError(err instanceof Error?err.message:"오류가 발생했습니다.");setMessages(m=>m.slice(0,-1));}finally{setLoading(false);}}
+  async function send(e?:FormEvent){e?.preventDefault();if(!input.trim()||loading)return;let id=selected;if(!id){const c=await createCase();id=c.id;setSelected(id);}const titleContent = input.trim().replace(/\*\*([^*]+)\*\*/g, "$1").replace(/\*([^*]+)\*/g, "$1").replace(/~~([^~]+)~~/g, "$1").replace(/`([^`]+)`/g, "$1");const content=input.trim();setInput("");setError("");setLoading(true);setMessages(m=>[...m,{case_id:id!,role:"user",content},{case_id:id!,role:"assistant",content:""}]);try{const result=await streamChat(id,content,t=>setMessages(m=>m.map((x,i)=>i===m.length-1?{...x,content:x.content+t}:x)));setAssessment(result);await refresh(id);}catch(err){setError(err instanceof Error?err.message:"오류가 발생했습니다.");setMessages(m=>m.slice(0,-1));}finally{setLoading(false);}}
   function exportPrint(){window.print();}
 
   async function onUpload(e:ChangeEvent<HTMLInputElement>){
@@ -112,10 +149,53 @@ export default function App(){
           ) : ("나")}</div><div className="bubble">{renderText(m.content||"답변을 정리하고 있습니다…")}</div></article>)}</div>
         {error&&<div className="error">{error}</div>} 
         <form className="composer" onSubmit={send}>
-          <div className="input">
-            <textarea value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}} placeholder="상황을 자세히 적어 주세요…" maxLength={8000}/>
-              <button disabled={loading||input.trim().length<2}>{loading?"…":"➜"}</button>
-          </div>
+          <div className={`input ${inputExpanded ? "expanded" : ""}`}><input
+            ref={fileInput}
+            type="file"
+            className="file-hidden"
+            onChange={onUpload}
+          />
+
+          <button
+            type="button"
+            className="attach-btn"
+            aria-label="첨부자료 추가"
+            title="첨부자료 추가"
+            disabled={uploading}
+            onClick={() => fileInput.current?.click()}
+          >
+            +
+          </button>
+          
+          <textarea
+            value={input}
+            onChange={e => {
+              const el = e.target;
+              el.style.height = "46px";
+              const nextHeight = Math.min(el.scrollHeight, 92);
+              el.style.height = `${nextHeight}px`;
+              el.style.overflowY = el.scrollHeight > 92 ? "auto" : "hidden";
+              setInputExpanded(nextHeight > 46);
+              setInput(el.value);
+            }}
+            onKeyDown={e => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                send();
+              }
+            }}
+            placeholder="상황을 자세히 적어 주세요…"
+            maxLength={8000}
+          />
+
+          <button
+            type="submit"
+            className="send-btn"
+            disabled={loading || input.trim().length < 2}
+          >
+            {loading ? "…" : "➜"}
+          </button>
+        </div>
           <small>일반적인 안내 도구이며 구체적인 판단은 교원단체·법률 전문가의 검토가 필요합니다.</small>
         </form>
       </section>
