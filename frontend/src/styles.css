@@ -1118,6 +1118,10 @@ section label {
   color: #777;
 }
 
+.layout.dark-mode .composer {
+  background-color: #333
+}
+
 .layout.dark-mode .error {
   background: #351c1c;
   color: #ffb4b4;
