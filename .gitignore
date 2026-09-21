@@ -11,3 +11,4 @@ interview_questions.txt
 TODO.md
 data/
 backend/.pytest_cache/
+package-lock.json
