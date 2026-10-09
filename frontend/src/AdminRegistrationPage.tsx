@@ -365,6 +365,20 @@ export default function AdminRegistrationPage({
                         )}
                       </small>
                     )}
+
+                    {application.document
+                      && !application.document.deleted_at
+                      && (
+                        <a
+                          className="admin-document-open"
+                          href={`/api/admin/registration-applications/${application.id}/document`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`${application.document.original_filename} 새 탭에서 열기`}
+                        >
+                          문서 열기
+                        </a>
+                      )}
                   </div>
 
                   <div className="admin-registration-review">

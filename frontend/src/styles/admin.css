@@ -255,6 +255,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 15px;
+  flex-wrap: wrap;
   border: 1px solid var(--line);
   border-radius: 9px;
   background: #ffffff;
@@ -288,6 +289,25 @@
   flex: 0 0 auto;
   color: var(--mute);
   font: 10.5px ui-monospace, monospace;
+}
+
+.admin-document-open {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 8px 11px;
+  border: 1px solid var(--accent);
+  border-radius: 7px;
+  background: #ffffff;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.admin-document-open:hover,
+.admin-document-open:focus-visible {
+  background: var(--soft);
+  outline: none;
 }
 
 

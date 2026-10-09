@@ -1,10 +1,12 @@
 from datetime import datetime, timezone
 from typing import Annotated
+from urllib.parse import quote
 
 from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
+    Response,
     status,
 )
 from pydantic import BaseModel, Field
@@ -15,6 +17,10 @@ from ..models import (
     RegistrationApplication,
     RegistrationDocument,
     User,
+)
+from ..services.storage_service import (
+    StorageOperationError,
+    download_registration_document,
 )
 from .auth import CurrentUserDependency
 
@@ -149,6 +155,74 @@ def list_registration_applications(
         )
 
     return result
+
+
+@router.get("/{application_id}/document")
+def view_registration_document(
+    application_id: int,
+    current_user: CurrentUserDependency,
+    session: SessionDependency,
+) -> Response:
+    """관리자에게만 비공개 가입 증빙 파일을 브라우저에서 보여준다."""
+    require_admin(current_user)
+
+    application = session.get(
+        RegistrationApplication,
+        application_id,
+    )
+    if application is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="회원가입 신청을 찾을 수 없습니다.",
+        )
+
+    document = session.exec(
+        select(RegistrationDocument).where(
+            RegistrationDocument.application_id == application.id,
+            RegistrationDocument.deleted_at.is_(None),
+        )
+    ).first()
+    if document is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="제출 문서를 찾을 수 없습니다.",
+        )
+
+    # 기존 가입 신청 API가 허용한 형식만 브라우저에 inline으로 전달한다.
+    allowed_types = {
+        "application/pdf": "pdf",
+        "image/jpeg": "jpg",
+        "image/png": "png",
+    }
+    content_type = document.content_type.lower()
+    if content_type not in allowed_types:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="미리보기를 지원하지 않는 문서 형식입니다.",
+        )
+
+    try:
+        content = download_registration_document(document.storage_path)
+    except StorageOperationError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="제출 문서를 불러오지 못했습니다.",
+        ) from error
+
+    filename = quote(document.original_filename, safe="")
+    fallback = f"document.{allowed_types[content_type]}"
+    return Response(
+        content=content,
+        media_type=content_type,
+        headers={
+            "Content-Disposition": (
+                f"inline; filename=\"{fallback}\"; "
+                f"filename*=UTF-8''{filename}"
+            ),
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @router.post("/{application_id}/approve")
